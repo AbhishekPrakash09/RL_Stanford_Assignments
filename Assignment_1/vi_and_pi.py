@@ -84,13 +84,15 @@ def policy_evaluation(P, nS, nA, policy, gamma=0.9, tol=1e-3):
         value_function_old = value_function.copy()
 
         for state in range (1, nS + 1):
+            
             previous_value = value_function[state - 1]
-            current_value = 0
+            current_value =  0
             for action in range (1, nA + 1):
+
                 probability, nextstate, reward, terminal = P[state][action]
                 current_value += reward + gamma * probability * previous_value
             
-            value_function[state - 1] = current_value
+            value_function[state - 1] = policy[state - 1] * current_value
                 
 
         # while loop termination criteria
