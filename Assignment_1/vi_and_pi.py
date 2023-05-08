@@ -4,6 +4,7 @@ import numpy as np
 import gymnasium as gym
 import time
 from lake_envs import *
+import json
 
 np.set_printoptions(precision=3)
 
@@ -83,23 +84,29 @@ def policy_evaluation(P, nS, nA, policy, gamma=0.9, tol=1e-3):
 
         value_function_old = value_function.copy()
 
-        for state in range (1, nS + 1):
-            
-            previous_value = value_function[state - 1]
-            current_value =  0
-            for action in range (1, nA + 1):
+        for state in range (nS):
 
-                probability, nextstate, reward, terminal = P[state][action]
-                current_value += reward + gamma * probability * previous_value
-            
-            value_function[state - 1] = policy[state - 1] * current_value
+            state_policy_action = policy[state]
+
+            immediate_reward = 0
+            future_rewards = 0           
+
+            for state_info in P[state][state_policy_action]:
+
+                probability, nextstate, reward, terminal = state_info
+
+                immediate_reward += probability * reward
+
+                if not terminal:
+                    future_rewards += probability * value_function_old[nextstate]
                 
-
+            
+            value_function[state] = immediate_reward + gamma * future_rewards
         # while loop termination criteria
         vf_diff = np.absolute(value_function - value_function_old)
         if max(vf_diff) < tol:
             break
-
+    
     ############################
     return value_function
 
@@ -127,7 +134,31 @@ def policy_improvement(P, nS, nA, value_from_policy, policy, gamma=0.9):
     new_policy = np.zeros(nS, dtype="int")
 
     ############################
-    # YOUR IMPLEMENTATION HERE #
+    
+    for state in range(nS):
+
+        state_actions_values = np.zeros(nA, dtype = 'float')
+
+        for action in range(nA):
+
+            immediate_reward = 0
+            future_rewards = 0           
+
+            for state_info in P[state][action]:
+
+                probability, nextstate, reward, terminal = state_info
+
+                immediate_reward += probability * reward
+
+                if not terminal:
+                    future_rewards += probability * value_from_policy[nextstate]
+
+            state_actions_values[action] = immediate_reward + gamma * future_rewards
+            
+
+        optimal_state_action = np.argmax(state_actions_values)
+
+        new_policy[state] = optimal_state_action
 
     ############################
     return new_policy
@@ -155,7 +186,17 @@ def policy_iteration(P, nS, nA, gamma=0.9, tol=1e-3):
     policy = np.zeros(nS, dtype=int)
 
     ############################
-    # YOUR IMPLEMENTATION HERE #
+    while True:
+
+        value_function_old = value_function.copy()
+
+        policy = policy_improvement(P, nS, nA, value_function, policy, gamma)
+
+        value_function = policy_evaluation(P, nS, nA, policy, gamma, tol)
+
+        vf_diff = np.absolute(value_function - value_function_old)
+        if max(vf_diff) < tol:
+            break
 
     ############################
     return value_function, policy
@@ -182,7 +223,28 @@ def value_iteration(P, nS, nA, gamma=0.9, tol=1e-3):
     value_function = np.zeros(nS)
     policy = np.zeros(nS, dtype=int)
     ############################
-    # YOUR IMPLEMENTATION HERE #
+    while True:
+        value_function_old = value_function.copy()
+        for state in range(nS):
+            state_action_rewards = np.zeros(nA)
+            for action in range (nA):
+                immediate_reward = future_rewards = 0
+
+                for state_info in P[state][action]:
+                    probability, nextstate, reward, terminal = state_info
+                    immediate_reward += probability * reward
+
+                    if not terminal:
+                        future_rewards += probability * value_function_old[nextstate]
+                
+                state_action_rewards[action] = immediate_reward + gamma * future_rewards
+            
+            value_function[state] = max(state_action_rewards)
+            policy[state] = np.argmax(state_action_rewards)
+
+        vf_diff = np.absolute(value_function - value_function_old)
+        if max(vf_diff) < tol:
+            break        
 
     ############################
     return value_function, policy
@@ -237,6 +299,10 @@ if __name__ == "__main__":
     env.nA = 4
 
     print("\n" + "-" * 25 + "\nBeginning Policy Iteration\n" + "-" * 25)
+
+    ########################Test Scripts########################
+    
+    ############################################################
 
     V_pi, p_pi = policy_iteration(env.P, env.nS, env.nA, gamma=0.9, tol=1e-3)
     render_single(env, p_pi, 100)
